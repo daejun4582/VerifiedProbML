@@ -1,83 +1,119 @@
 # CertiBisect
 
-CertiBisect is a small Lean 4 project that computes rational bounds for `√2`
-with exact bisection and proves the result correct using Mathlib.
+Small Lean 4 formalizations of numerical and probabilistic results that show up
+in machine learning. The repository started with an exact bisection example for
+`√2`; it now also contains two results I wanted to work through more carefully:
 
-The project is also a compact experiment in MCP-assisted formalization: Codex
-can inspect Lean diagnostics and proof goals through `lean-lsp-mcp`, while Lean
-remains the final checker for every theorem.
+- minimum-variance weighting of independent Gaussian estimates;
+- optimality of the true probability under binary cross-entropy.
 
-## Status
+The emphasis is on stating the assumptions explicitly and having Lean check the
+algebra, probability, and optimization arguments.
 
-**Verified MVP complete.** The project builds without errors, warnings,
-`sorry`, `admit`, or project-defined axioms.
+## 1. Gaussian weighted ensembles
 
-## Result
-
-Starting with the interval `[1, 2]`, ten exact bisection steps produce
-
-```text
-181 / 128 ≤ √2 ≤ 1449 / 1024
-interval width = 1 / 1024
-```
-
-Running the demo prints:
+Suppose several estimators have a common mean and variances `σᵢ²`. For weights
+whose sum is one, define
 
 ```text
-CertiBisect: certified rational bounds for sqrt(2)
-lower = 181/128
-upper = 1449/1024
-width = 1/1024
-Lean theorem: lower ≤ sqrt(2) ≤ upper
+X̂ = ∑ i, wᵢ Xᵢ.
 ```
 
-All interval calculations use rational numbers, so no floating-point rounding
-is involved in the certificate.
+The Lean development proves:
 
-## What is proved
+- the common mean is preserved, so the weighted estimator is unbiased;
+- if the estimators are independent, then
+  `Var(X̂) = ∑ i, wᵢ² σᵢ²`;
+- if the estimators are Gaussian, their independent weighted sum is Gaussian;
+- inverse-variance weights minimize the variance among all weights summing to
+  one.
 
-| Claim | Lean declaration |
+The optimal weights are
+
+```text
+wᵢ = (1 / σᵢ²) / ∑ j, (1 / σⱼ²).
+```
+
+Instead of stopping at the Lagrange multiplier condition, the proof establishes
+the global minimum through the identity
+
+```text
+V(w) = V(w*) + ∑ i, σᵢ² (wᵢ - wᵢ*)².
+```
+
+The main declarations are:
+
+| Result | Lean declaration |
 |---|---|
-| One bisection step halves the interval width | `CertiBisect.Interval.width_step` |
-| One step preserves the endpoint-square bracket around `2` | `CertiBisect.Interval.step_preserves_bracket` |
-| Any number of steps preserves the bracket | `CertiBisect.Interval.iterate_preserves_bracket` |
-| After `n` steps, the width is the initial width divided by `2^n` | `CertiBisect.Interval.width_iterate` |
-| Ten steps yield exactly `[181/128, 1449/1024]` | `CertiBisect.sqrtTwoAfterTen_eq` |
-| The ten-step interval has width `1/1024` | `CertiBisect.sqrtTwoAfterTen_width` |
-| The rational endpoints genuinely bound the real number `√2` | `CertiBisect.sqrtTwoAfterTen_containsRoot` |
+| Weights summing to one preserve a common expectation | `weightedSum_expectation` |
+| Variance of an independent weighted sum | `weightedSum_variance` |
+| An independent weighted Gaussian sum is Gaussian | `weightedSum_isGaussian` |
+| Quadratic variance decomposition | `ensembleVariance_decomposition` |
+| Precision weights give a global minimum | `precisionWeight_minimizes` |
+| Inverse-variance weights minimize variance | `inverseVarianceWeight_minimizes` |
 
-The final real-number statement is:
+### Exact three-model example
 
-```lean
-theorem sqrtTwoAfterTen_containsRoot :
-    (181 : ℝ) / 128 ≤ Real.sqrt 2 ∧
-      Real.sqrt 2 ≤ (1449 : ℝ) / 1024
+For model variances `[1, 4, 9]`, Lean checks that the inverse-variance weights
+and resulting minimum variance are
+
+```text
+weights           = [36/49, 9/49, 4/49]
+ensemble variance = 36/49
 ```
 
-## How it works
+It also proves that this variance is no larger than the variance produced by
+any other three weights that sum to one.
 
-For an interval `[lower, upper]`, CertiBisect calculates the rational midpoint
-`m` and checks `m² ≤ 2` exactly.
+## 2. Binary cross-entropy
 
-- If `m² ≤ 2`, the next interval is `[m, upper]`.
-- Otherwise, the next interval is `[lower, m]`.
+For a true Bernoulli probability `p` and a reported probability `q`, define
 
-Lean proves that this update keeps `2` between the endpoint squares and cuts
-the interval width in half. Induction then lifts both facts to any number of
-iterations. The concrete ten-step result is finally connected to `Real.sqrt 2`.
+```text
+CE(p, q) = -p log(q) - (1-p) log(1-q).
+```
 
-## Requirements
+For `p,q ∈ (0,1)`, the formalization proves the decomposition
 
-- Lean `4.34.0`, managed with `elan`
-- Lake `5.0.0`
-- Mathlib `v4.34.0`
+```text
+CE(p, q) = H(p) + KL(Bernoulli(p) || Bernoulli(q)).
+```
 
-The repository's `lean-toolchain` and `lake-manifest.json` pin the required
-versions.
+It then proves the Bernoulli version of Gibbs' inequality and concludes
+
+```text
+CE(p, p) ≤ CE(p, q).
+```
+
+This is the small mathematical statement behind the claim that expected binary
+log loss is minimized by reporting the true probability.
+
+| Result | Lean declaration |
+|---|---|
+| Self cross-entropy equals binary entropy | `crossEntropy_self` |
+| Cross-entropy/entropy/KL decomposition | `crossEntropy_eq_entropy_add_kl` |
+| Bernoulli KL is nonnegative | `bernoulliKL_nonneg` |
+| Truth minimizes expected binary log loss | `crossEntropy_minimized_at_truth` |
+
+The boundary cases `p = 0,1` or `q = 0,1` are deliberately excluded from the
+main theorem so that every logarithm has a positive argument.
+
+## 3. Exact bisection baseline
+
+The original module performs ten rational bisection steps for `x² = 2` and
+proves
+
+```text
+181/128 ≤ √2 ≤ 1449/1024
+interval width = 1/1024.
+```
+
+This part is kept as a smaller example of an executable calculation carrying a
+proof certificate.
 
 ## Build and run
 
-From the repository root:
+The toolchain is pinned to Lean `4.34.0` and Mathlib `v4.34.0`.
 
 ```bash
 lake update
@@ -85,62 +121,23 @@ lake build
 lake env lean --run Main.lean
 ```
 
-`lake update` is only needed during initial setup or after dependency changes.
+`lake update` is only needed after the initial clone or when dependencies
+change. The executable prints the exact bisection interval and the concrete
+three-model ensemble result.
 
-An optional native executable target is available as `certibisect`:
-
-```bash
-lake build certibisect
-lake exe certibisect
-```
-
-The first native build may take considerably longer because Mathlib dependencies
-need native code generation. The `lean --run` command is faster for this MVP.
-
-## Project structure
+## Layout
 
 ```text
-.
-├── CertifiedBisectionLean/
-│   ├── Basic.lean       # Environment smoke test
-│   ├── Interval.lean    # Rational interval, bisection, and generic proofs
-│   └── SqrtTwo.lean     # Concrete √2 certificate
-├── CertifiedBisectionLean.lean
-├── Main.lean            # Executable demonstration
-├── lakefile.toml
-└── lean-toolchain
+CertifiedBisectionLean/
+├── BinaryCrossEntropy.lean  # BCE, binary entropy, and Bernoulli KL
+├── GaussianEstimator.lean   # unbiased Gaussian ensembles and optimal weights
+├── Interval.lean            # exact rational bisection
+└── SqrtTwo.lean             # concrete √2 certificate
+Main.lean                    # small executable summary
 ```
 
-## MCP-assisted workflow
+## Verification
 
-The local Codex setup uses `lean-lsp-mcp` over STDIO. During the MVP it was
-used to:
-
-- read file diagnostics;
-- inspect an induction proof goal;
-- test alternative tactics without editing the file;
-- rebuild the Lake project;
-- scan key theorems for suspicious source patterns and report used axioms;
-- run a standalone Lean smoke test.
-
-The MCP server accelerates the edit-check loop, but it is not part of the
-trusted proof result. The Lean source must still elaborate and pass Lean's
-checker.
-
-## Verification performed
-
-- `lake build`: passed
-- Lean diagnostics for all project files: 0 errors, 0 warnings
-- source scan: no `sorry`, `admit`, or project-defined `axiom`
-- executable demo: passed
-- MCP theorem verification: no suspicious source warnings
-
-## Current scope
-
-This MVP intentionally specializes the algorithm to the equation `x² = 2` and
-rational endpoints. Possible extensions include:
-
-- generalizing from `2` to a positive rational constant `c`;
-- supporting rational-coefficient polynomials;
-- proving a generic bisection theorem for continuous real functions;
-- recording a larger benchmark of MCP-assisted proof attempts.
+`lake build` checks every declaration. The project currently contains no
+`sorry`, `admit`, or project-defined axioms. GitHub Actions runs the same Lean
+build on each push.

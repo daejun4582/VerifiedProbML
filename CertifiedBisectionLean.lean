@@ -1,3 +1,5 @@
 import CertifiedBisectionLean.Basic
+import CertifiedBisectionLean.BinaryCrossEntropy
+import CertifiedBisectionLean.GaussianEstimator
 import CertifiedBisectionLean.Interval
 import CertifiedBisectionLean.SqrtTwo
