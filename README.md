@@ -1,14 +1,15 @@
-# CertiBisect
+# Verified ProbML
 
-Small Lean 4 formalizations of numerical and probabilistic results that show up
-in machine learning. The repository started with an exact bisection example for
-`√2`; it now also contains two results I wanted to work through more carefully:
+Lean 4 formalizations of two foundational results from probabilistic machine
+learning:
 
 - minimum-variance weighting of independent Gaussian estimates;
 - optimality of the true probability under binary cross-entropy.
 
-The emphasis is on stating the assumptions explicitly and having Lean check the
-algebra, probability, and optimization arguments.
+I built this project while reviewing probability, constrained optimization, and
+information theory. The aim is to make the assumptions visible and have Lean
+check each algebraic, probabilistic, and optimization step. An earlier exact
+bisection exercise is kept as a smaller baseline at the end of the repository.
 
 ## 1. Gaussian weighted ensembles
 
@@ -98,9 +99,9 @@ log loss is minimized by reporting the true probability.
 The boundary cases `p = 0,1` or `q = 0,1` are deliberately excluded from the
 main theorem so that every logarithm has a positive argument.
 
-## 3. Exact bisection baseline
+## 3. Additional baseline: exact bisection
 
-The original module performs ten rational bisection steps for `x² = 2` and
+An earlier Lean exercise performs ten rational bisection steps for `x² = 2` and
 proves
 
 ```text
@@ -108,8 +109,8 @@ proves
 interval width = 1/1024.
 ```
 
-This part is kept as a smaller example of an executable calculation carrying a
-proof certificate.
+This module is separate from the probabilistic ML results and is kept as a
+compact example of an executable calculation carrying a proof certificate.
 
 ## Build and run
 
@@ -122,8 +123,8 @@ lake env lean --run Main.lean
 ```
 
 `lake update` is only needed after the initial clone or when dependencies
-change. The executable prints the exact bisection interval and the concrete
-three-model ensemble result.
+change. The executable prints the concrete three-model ensemble result together
+with the earlier exact-bisection example.
 
 ## Layout
 
